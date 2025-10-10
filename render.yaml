@@ -10,4 +10,3 @@ services:
     branch: main
     envVars:
       - key: TOKEN
-        fromDatabase: true # если используешь секреты Render
