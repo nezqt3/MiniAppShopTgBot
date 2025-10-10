@@ -2,6 +2,7 @@ import os
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import subprocess
+from telebot import *
 import time
 
 class RestartHandler(FileSystemEventHandler):

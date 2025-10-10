@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: ghost404-backend
+    env: python
+    plan: free
+    region: oregon # или frankfurt, eu-central и т.д.
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    repo: https://github.com/your-username/your-repo
+    branch: main
+    envVars:
+      - key: TOKEN
+        fromDatabase: true # если используешь секреты Render
