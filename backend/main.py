@@ -1,11 +1,10 @@
-from telebot import TeleBot
+from telebot import TeleBot, types
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 from database import DataBase
 import os
 from datetime import datetime
-import threading
 
 load_dotenv()
 
@@ -14,19 +13,20 @@ class Bot:
         self.bot = TeleBot(token=os.getenv("TOKEN"))
         self.db = DataBase()
         self.app = Flask(__name__)
-        CORS(self.app, origins="*")  # Разрешаем все источники для dev
+        CORS(self.app, origins="*")
 
         self._register_handlers()
         self._register_apis()
+        self._register_webhook()
+        
+        self._setup_webhook()
 
-        threading.Thread(
-            target=lambda: self.app.run(port=5000, debug=True, use_reloader=False)
-        ).start()
-
+    # ------------------- Handlers -------------------
     def _register_handlers(self):
         self.bot.register_message_handler(self.show_menu, commands=['start'])
         self.bot.register_message_handler(self.instructions, commands=['help'])
 
+    # ------------------- API Routes -------------------
     def _register_apis(self):
         self.app.route("/get_user", methods=['GET'])(self.get_user)
         self.app.route("/create_user", methods=['POST'])(self.create_user)
@@ -37,16 +37,23 @@ class Bot:
         self.app.route("/points/referral", methods=['GET'])(self.get_referals_points)
         self.app.route("/referral_link", methods=["PUT"])(self.put_referral_link)
 
+    # ------------------- Webhook -------------------
+    def _register_webhook(self):
+        @self.app.route("/webhook", methods=["POST"])
+        def webhook():
+            json_data = request.get_data().decode("utf-8")
+            update = types.Update.de_json(json_data)
+            self.bot.process_new_updates([update])
+            return "OK", 200
+
+    # ------------------- API Handlers -------------------
     def get_purchases(self):
         user_id = request.args.get('id')
         data = self.db.get_data(table="purchases", column="id", element=user_id)
         return jsonify(data)
-    
+
     def ping(self):
-        return jsonify({
-            "status": "ok",
-            "message": "Flask API работает ✅",
-        })
+        return jsonify({"status": "ok", "message": "Flask API работает ✅"})
 
     def get_user(self):
         user_id = request.args.get('id')
@@ -57,22 +64,22 @@ class Bot:
         data = request.get_json()
         self.db.insert_data(table="users", data=data)
         return jsonify({"status": "success", "data": data})
-    
+
     def get_sum_points(self):
         user_id = request.args.get('id')
         user = self.db.get_data(table="points", column="id", element=user_id)
         return jsonify({"sum_points": sum([elem.get("count") for elem in user])})
-    
+
     def get_history_points(self):
         user_id = request.args.get('id')
         user = self.db.get_data(table="points", column="id", element=user_id)
         return jsonify({"data": user})
-    
+
     def get_referals_points(self):
         user_id = request.args.get('id')
         user = self.db.get_data(table="points", column="id", element=user_id)
         return jsonify({"sum_points": [elem.get("count") for elem in user]})
-    
+
     def put_referral_link(self):
         json_data = request.get_json()
         user_id = json_data.get('id')
@@ -87,9 +94,9 @@ class Bot:
             match_value=user_id,
             data={"referal_link": referral_link} 
         )
-
         return jsonify({"status": "success", "data": updated})
-        
+
+    # ------------------- Bot Handlers -------------------
     def show_menu(self, message):        
         referrer_id = None
         if message.text.startswith('/start '):
@@ -106,7 +113,12 @@ class Bot:
                 "referred_by": referrer_id 
             })
             if referrer_id:
-                self.db.insert_data(table="points", data={"id": referrer_id, "count": 150, "for_this": "Реферальная ссылка", "date": datetime.now().strftime("%d.%m.%Y") })
+                self.db.insert_data(table="points", data={
+                    "id": referrer_id, 
+                    "count": 150, 
+                    "for_this": "Реферальная ссылка", 
+                    "date": datetime.now().strftime("%d.%m.%Y") 
+                })
 
         self.bot.send_message(
             message.chat.id,
@@ -122,6 +134,18 @@ class Bot:
             parse_mode="Markdown"
         )
 
+    def _setup_webhook(self):
+        webhook_url = os.getenv("WEBHOOK_URL")
+        if webhook_url and not os.getenv("DEBUG"):
+            self.bot.remove_webhook()
+            self.bot.set_webhook(url=f"{webhook_url}/webhook")
+            print(f"Webhook установлен: {webhook_url}/webhook")
+            
+    def start_flask(self):
+        debug = os.getenv("DEBUG", "False").lower() == "true"
+        port = int(os.environ.get("PORT", 5000))
+        self.app.run(host="0.0.0.0", port=port, debug=debug)
+
     def instructions(self, message):
         self.bot.send_message(
             message.chat.id,
@@ -133,10 +157,10 @@ class Bot:
             parse_mode="Markdown"
         )
 
-    def start_bot(self):
-        self.bot.infinity_polling()
-
+    # ------------------- Запуск -------------------
+    def start_flask(self):
+        self.app.run(port=5000, debug=True, use_reloader=False)
 
 if __name__ == "__main__":
     bot = Bot()
-    threading.Thread(target=bot.start_bot).start()
+    bot.start_flask()
