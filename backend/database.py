@@ -30,3 +30,11 @@ class DataBase(object):
             .execute()
         )
         return response.data
+    
+# print(DataBase().insert_data(table="purchases", data={
+#     "id": 1,
+#     "cost": 3,
+#     "paid_cost": 3,
+#     "count": 2,
+#     "name":
+# }))
