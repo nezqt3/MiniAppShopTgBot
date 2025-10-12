@@ -36,10 +36,10 @@ class Bot:
         self.app.route("/referral_link", methods=["PUT"])(self.put_referral_link)
         self.app.route("/bot", methods=["POST"])(self.webhook)
 
-    def webhook():
+    def webhook(self):
         json_str = request.get_data().decode("utf-8")
         update = types.Update.de_json(json_str)
-        bot.process_new_updates([update])
+        self.bot.process_new_updates([update])
         return "ok", 200
 
     def get_purchases(self):
@@ -130,6 +130,7 @@ class Bot:
 
     def show_menu(self, message):
         referrer_id = None
+        print(message.content)
         if message.text.startswith('/start '):
             payload = message.text.split(' ')[1]
             if payload.isdigit():
@@ -208,11 +209,5 @@ class Bot:
         port = int(os.environ.get("PORT", 5000))
         self.app.run(port=port, debug=debug, use_reloader=False)
 
-if __name__ == "__main__":
-    bot = Bot()
-    flask_thread = threading.Thread(target=bot.start_flask)
-    flask_thread.start()
-
-    # Telegram-бот в основном потоке
-    bot.bot.remove_webhook()
-    bot.bot.infinity_polling(skip_pending=True)
+bot_instance = Bot()
+app = bot_instance.app
