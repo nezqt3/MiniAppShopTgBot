@@ -9,4 +9,4 @@ services:
     repo: https://github.com/your-username/your-repo
     branch: main
     envVars:
-      - key: TOKEN
+      - key: 8477044848:AAEtFB8sUdxi4KkYGypov7WgtQY4yyneK5U
